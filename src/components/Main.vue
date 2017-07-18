@@ -364,7 +364,6 @@ export default {
                 let temp = _.cloneDeep(this.getFiles.find(a => a.fileName === el));
                 // console.log("Temp", temp);
                 temp.dataTransformed = [];
-                temp.dataFitted = []; // Initialize an empty fitted data array for later use
 
                 if(this.currentConfiguration.fit !== 'None' && this.currentConfiguration.fit !== 'Linear') {
                   temp.dataTransformed = fd.transformData(temp, this.currentConfiguration);
@@ -381,7 +380,6 @@ export default {
                 // Set temp file for uploaded
                 let temp = _.cloneDeep(this.uploadedFiles.find(a => a.fileName === el));
                 temp.dataTransformed = [];
-                temp.dataFitted = []; // Initialize an empty fitted data array for later use
 
                 if(this.currentConfiguration.fit !== 'None' && this.currentConfiguration.fit !== 'Linear') {
                   temp.dataTransformed = fd.transformData(temp, this.currentConfiguration);
@@ -459,16 +457,6 @@ export default {
         // console.log("Temp", temp);
         return d3.merge(temp);
       },
-      getFittedData: function (sd) {
-        let temp = [];
-        for(let i = 0; i < sd.length; i++) {
-          if(sd[i].fileName === this.fileToFit) {
-            temp.push(sd[i].dataFitted);
-          }
-        }
-
-        return d3.merge(temp);
-      },
       setParameters: function () {
         // Function to wrap up all the parameters needed for plotting
         // console.log("Data", this.selectedData);
@@ -476,7 +464,7 @@ export default {
           data: this.prepData(this.selectedData),
           colorDomain: this.colorDomain,
           scales: this.scales,
-          fittedData: this.getFittedData(this.selectedData),
+          fileToFit: this.fileToFit,
           titles: this.titles,
           fitConfiguration: this.currentConfiguration
         };
@@ -515,15 +503,7 @@ export default {
             // Find previous file to fit's fitted data a reset it to an empty array
             if(el === this.prevFileToFit) {
               this.selectedData[i].dataFitted = [];
-            }
-            
-            // Find new file to fit and set the array to fitted data points
-            if(el === this.fileToFit && this.currentConfiguration.fit !== "None") {
-              let tempData = this.currentConfiguration.fit === "Linear" ? this.selectedData[i].data : this.selectedData[i].dataTransformed;
-              let maxX = d3.max(tempData, function(d) { return d.x; });
-              let minX = d3.min(tempData, function(d) { return d.x; });
-              this.selectedData[i].dataFitted = fd.fitData(tempData, this.currentConfiguration.equation, minX, maxX);
-            }
+            }  
           }
         }
       },
@@ -547,25 +527,11 @@ export default {
             //When current data changes after selected
             this.selectedData.forEach( el => {
               el.dataTransformed = fd.transformData(el, this.currentConfiguration);
-              
-              // Re-fit data according to new fit equation
-              if(el.fileName === this.fileToFit) {
-                let maxX = d3.max(el.data, function(d) { return d.x; });
-                let minX = d3.min(el.data, function(d) { return d.x; });
-                el.dataFitted = fd.fitData(el.dataTransformed, this.currentConfiguration.equation, minX, maxX);
-              }
             })
             // this.transformedData = fd.transformData(this.selectedData, this.currentConfiguration);
           } else {
             this.selectedData.forEach( el => {
               el.dataTransformed = []; // reset since transformed data is 'None' or 'Linear'
-
-              // Only re-fit data if it's linear...you don't fit a line that is 'none'
-              if(el.fileName === this.fileToFit && this.currentConfiguration.fit === 'Linear') {
-                let maxX = d3.max(el.data, function(d) { return d.x; });
-                let minX = d3.min(el.data, function(d) { return d.x; });
-                el.dataFitted = fd.fitData(el.data, this.currentConfiguration.equation, minX, maxX);
-              }
             });
           }
         },
