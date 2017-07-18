@@ -26,6 +26,7 @@ export default {
             // Filter any infinity values before plotting, this will happen when transforming log data = 0
             data = data.filter((d) => Number.isFinite(d.y) && Number.isFinite(d.x) && d.y > 0);
 
+
             var xScale = parameters.scales.xScale;
             xScale.range([0,width]); //scales according to fit type
             var yScale = parameters.scales.yScale;
@@ -33,6 +34,36 @@ export default {
             var xTitle = parameters.titles.xTitle; //xTitle according to label
             var yTitle = parameters.titles.yTitle; //yTitle according to label
             
+            // Pull data to be fitted if there is a file selected to be fit
+            // Pull equation for fitting data
+            var isFit = parameters.fileToFit !== null && parameters.fitConfiguration.equation !== null;
+            if(isFit) {
+                var dataToFit = data.filter((d) => d.name === parameters.fileToFit);
+                var equation = parameters.fitConfiguration.equation;
+                var margin2 = { top: 20, bottom: 20, left: 20, right: 20};
+                var height2 = 600 - margin2.top - margin2.bottom;
+                var xScale2 = d3.scaleLinear().range([0, width]);
+                var yScale2 = d3.scaleLinear().range([height2, 0]);
+                var xAxis2 = d3.axisBottom(xScale2);
+                
+                var slider = svg.append("g")
+                .attr("class", "slider")
+                .attr("transform", "translate(" + margin2.left + "," + (margin2.top-20) + ")");
+    
+                var brush = d3.brushX()
+                    .extent([
+                        [0, 0],
+                        [width, height2]
+                    ])
+                    .on("brush end", brushed);
+
+                xScale2.domain(xScale.domain());
+                yScale2.domain(yScale.domain());
+
+                console.log("Data to Fit (" + parameters.fileToFit + "):", dataToFit);
+                console.log("Fitting equation:", equation);
+            }
+
             //Set Axes
             var xAxis = d3.axisBottom(xScale).ticks(10).tickSize(-height),
                 yAxis = d3.axisLeft(yScale).ticks(10).tickSize(-width);
@@ -304,10 +335,44 @@ export default {
                                 .style("opacity", 0);
                         });;
                     
-                    //Code to Plot Fitted Line
-                    // if(fitLine){
-                    //     //code will go here
-                    // }
+                    // Code to Plot Fitted Line
+                    if(isFit){
+                        // Fit data and return points to plot fitted line
+                        var fitLineData = fd.fitData(dataToFit, equation, minX, maxX);
+
+                        // Append fitted line
+                        var fitLine = plot.append("g");
+                        fitLine.append("line")
+                                .attr("clip-path", "url(#clip)")
+                                .attr("class", "fitLine")
+                                .attr("x1", xScale(lg.ptA.x))
+                                .attr("y1", yScale(lg.ptA.y))
+                                .attr("x2", xScale(lg.ptB.x))
+                                .attr("y2", yScale(lg.ptB.y));
+                    }
+
+                    // Code to Add Slider Brush
+                    if(isFit) {
+                        var sliderdots = slider.append("g");
+                        sliderdots.selectAll("dotslider")
+                            .data(data)
+                            .enter().append("line")
+                            .attr('class', 'dotslider')
+                            .attr("x1", function(d) { return xScale2(d.x); })
+                            .attr("y1", height2)
+                            .attr("x2", function(d) { return xScale2(d.x); })
+                            .attr("y2", 0);
+
+                        slider.append("g")
+                            .attr("class", "axis axis--x")
+                            .attr("transform", "translate(0," + height2 + ")")
+                            .call(xAxis2);
+
+                        slider.append("g")
+                            .attr("class", "brush")
+                            .call(brush)
+                            .call(brush.move, xScale.range());
+                    }
 
                     // Add the Legend
                     var legend = plot.append("g");
@@ -446,10 +511,56 @@ export default {
                     });
 
                 //Code to re-draw fitted line
-                // if(fitLine){
-                //     //code will go here
-                // }
+                if(isFit){
+                    var new_fitLineFunction = d3.line()
+                    .x(function (d) {
+                        return new_xScale(d.x);
+                    })
+                    .y(function (d) {
+                        return new_yScale(d.y);
+                    });
+
+                plot.selectAll(".pointlines")
+                    .attr("d", new_plotLine);
+                }
             }
+
+                //create brush function redraw scatterplot with selection
+                function brushed() {
+                    var selection = d3.event.selection;
+
+                    if (selection !== null) {
+                        var e = d3.event.selection.map(xScale2.invert, xScale2);
+                        // console.log("Extent selected", e);
+
+                        slider.selectAll(".dotslider")
+                            .classed("selected-slider", function (d) {
+                                return e[0] <= d.x && d.x <= e[1];
+                            })
+
+                        plot.selectAll(".dot")
+                            .classed("selected", function (d) {
+                                return e[0] <= d.x && d.x <= e[1];
+                            }).attr("d", function(d) {
+                                if( e[0] <= d.x && d.x <= e[1]) {
+                                    return triangleGenerator(); 
+                                } else { 
+                                    return circleGenerator(); }
+                            });
+
+                        let new_dataToFit = dataToFit.filter(function(d) {
+                            return e[0] <= d.x && d.x <= e[1];
+                        })
+                        
+                        fitLineData = fd.fitData(new_dataToFit, equation, minX, maxX);
+
+                        d3.select(".fitLine").transition()
+                            .attr("x1", xScale(lg.ptA.x))
+                            .attr("y1", yScale(lg.ptA.y))
+                            .attr("x2", xScale(lg.ptB.x))
+                            .attr("y2", yScale(lg.ptB.y));
+                    }
+                }
 
         }
     }

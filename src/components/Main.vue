@@ -495,16 +495,7 @@ export default {
           eventBus.$emit('reset-fit');
           // this.setFit('None');
         } else {
-
-        for(let i=0; i < this.selectedData.length; i++) {
-            let el = this.selectedData[i].fileName;
-            // console.log("El:", el);
-            
-            // Find previous file to fit's fitted data a reset it to an empty array
-            if(el === this.prevFileToFit) {
-              this.selectedData[i].dataFitted = [];
-            }  
-          }
+          this.setParameters();
         }
       },
       selectedData: {
